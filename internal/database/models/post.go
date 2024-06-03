@@ -1,8 +1,8 @@
 package models
 
 type Post struct {
-	ID            int
-	Title         string
-	Content       string
-	AllowComments bool
+	ID            string `json:"id"`
+	Title         string `json:"title"`
+	Content       string `json:"content"`
+	AllowComments bool   `json:"allow_comments"`
 }

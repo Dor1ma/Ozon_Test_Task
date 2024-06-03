@@ -4,6 +4,7 @@ import (
 	"context"
 	"github.com/Dor1ma/Ozon_Test_Task/internal/database/models"
 	"github.com/jackc/pgx/v4"
+	"time"
 )
 
 // Имплементация репозитория для работы в режиме "postgres"
@@ -13,7 +14,7 @@ type PostgreSQLRepository struct {
 }
 
 func NewPostgreSQLRepository(db *pgx.Conn) *PostgreSQLRepository {
-	return &PostgreSQLRepository{db}
+	return &PostgreSQLRepository{db: db}
 }
 
 func (r *PostgreSQLRepository) CreatePost(title string, content string, allowComments bool) (*models.Post, error) {
@@ -51,13 +52,15 @@ func (r *PostgreSQLRepository) GetPosts() ([]*models.Post, error) {
 		}
 		posts = append(posts, &post)
 	}
+
 	if err := rows.Err(); err != nil {
 		return nil, err
 	}
+
 	return posts, nil
 }
 
-func (r *PostgreSQLRepository) GetPostByID(id int) (*models.Post, error) {
+func (r *PostgreSQLRepository) GetPostByID(id string) (*models.Post, error) {
 	query := `
         SELECT id, title, content, allow_comments
         FROM posts
@@ -73,15 +76,15 @@ func (r *PostgreSQLRepository) GetPostByID(id int) (*models.Post, error) {
 	return &post, nil
 }
 
-func (r *PostgreSQLRepository) CreateComment(postID int, content string, parentID *int) (*models.Comment, error) {
+func (r *PostgreSQLRepository) CreateComment(postID string, content string, parentID *string) (*models.Comment, error) {
 	query := `
 		INSERT INTO comments (post_id, content, parent_id, created_at)
-		VALUES ($1, $2, $3, NOW())
+		VALUES ($1, $2, $3, $4)
 		RETURNING id, post_id, content, parent_id, created_at
 	`
 
 	var comment models.Comment
-	err := r.db.QueryRow(context.Background(), query, postID, content, parentID).Scan(
+	err := r.db.QueryRow(context.Background(), query, postID, content, parentID, time.Now()).Scan(
 		&comment.ID, &comment.PostID, &comment.Content, &comment.ParentID, &comment.CreatedAt,
 	)
 	if err != nil {
@@ -91,7 +94,7 @@ func (r *PostgreSQLRepository) CreateComment(postID int, content string, parentI
 	return &comment, nil
 }
 
-func (r *PostgreSQLRepository) GetComments(postID int) ([]*models.Comment, error) {
+func (r *PostgreSQLRepository) GetComments(postID string) ([]*models.Comment, error) {
 	query := `
 		SELECT id, post_id, content, parent_id, created_at
 		FROM comments

@@ -4,6 +4,7 @@ go 1.21.1
 
 require (
 	github.com/99designs/gqlgen v0.17.47
+	github.com/jackc/pgx/v4 v4.18.3
 	github.com/vektah/gqlparser/v2 v2.5.12
 )
 
@@ -19,7 +20,7 @@ require (
 	github.com/jackc/pgproto3/v2 v2.3.3 // indirect
 	github.com/jackc/pgservicefile v0.0.0-20221227161230-091c0ba34f0a // indirect
 	github.com/jackc/pgtype v1.14.0 // indirect
-	github.com/jackc/pgx/v4 v4.18.3 // indirect
+	github.com/joho/godotenv v1.5.1 // indirect
 	github.com/mitchellh/mapstructure v1.5.0 // indirect
 	github.com/sosodev/duration v1.3.1 // indirect
 	golang.org/x/crypto v0.20.0 // indirect

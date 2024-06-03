@@ -3,6 +3,7 @@ package storage
 import (
 	"errors"
 	"github.com/Dor1ma/Ozon_Test_Task/internal/database/models"
+	"strconv"
 	"sync"
 	"time"
 )
@@ -10,16 +11,16 @@ import (
 // Имплементация репозитория для работы в режиме "in_memory"
 
 type InMemoryRepository struct {
-	posts     map[int]*models.Post
-	comments  map[int][]*models.Comment
+	posts     map[string]*models.Post
+	comments  map[string][]*models.Comment
 	postIDSeq int // Счетчик для генерации уникальных ID постов
 	mutex     sync.RWMutex
 }
 
 func NewInMemoryRepository() *InMemoryRepository {
 	return &InMemoryRepository{
-		posts:    make(map[int]*models.Post),
-		comments: make(map[int][]*models.Comment),
+		posts:    make(map[string]*models.Post),
+		comments: make(map[string][]*models.Comment),
 	}
 }
 
@@ -28,7 +29,7 @@ func (r *InMemoryRepository) CreatePost(title, content string, allowComments boo
 	defer r.mutex.Unlock()
 
 	post := &models.Post{
-		ID:            r.postIDSeq,
+		ID:            strconv.Itoa(r.postIDSeq),
 		Title:         title,
 		Content:       content,
 		AllowComments: allowComments,
@@ -52,7 +53,7 @@ func (r *InMemoryRepository) GetPosts() ([]*models.Post, error) {
 	return posts, nil
 }
 
-func (r *InMemoryRepository) GetPostById(id int) (*models.Post, error) {
+func (r *InMemoryRepository) GetPostByID(id string) (*models.Post, error) { // изменено: параметр и возвращаемое значение теперь string
 	r.mutex.RLock()
 	defer r.mutex.RUnlock()
 
@@ -64,7 +65,7 @@ func (r *InMemoryRepository) GetPostById(id int) (*models.Post, error) {
 	return post, nil
 }
 
-func (r *InMemoryRepository) CreateComment(postID int, content string, parentID *int) (*models.Comment, error) {
+func (r *InMemoryRepository) CreateComment(postID string, content string, parentID *string) (*models.Comment, error) { // изменено: параметр теперь string
 	r.mutex.Lock()
 	defer r.mutex.Unlock()
 
@@ -74,7 +75,7 @@ func (r *InMemoryRepository) CreateComment(postID int, content string, parentID 
 	}
 
 	comment := &models.Comment{
-		ID:        len(r.comments[postID]) + 1,
+		ID:        strconv.Itoa(len(r.comments[postID]) + 1),
 		PostID:    postID,
 		ParentID:  parentID,
 		Content:   content,
@@ -86,7 +87,7 @@ func (r *InMemoryRepository) CreateComment(postID int, content string, parentID 
 	return comment, nil
 }
 
-func (r *InMemoryRepository) GetComments(postID int) ([]*models.Comment, error) {
+func (r *InMemoryRepository) GetComments(postID string) ([]*models.Comment, error) {
 	r.mutex.RLock()
 	defer r.mutex.RUnlock()
 
