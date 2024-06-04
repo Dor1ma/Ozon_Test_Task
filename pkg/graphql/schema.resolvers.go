@@ -103,29 +103,46 @@ func (r *queryResolver) Comments(ctx context.Context, postID string, first *int,
 	for i, edge := range comments.Edges {
 		commentEdges[i] = &model.CommentEdge{
 			Cursor: edge.Cursor,
-			Node:   edge.Node,
+			Node: &model.Comment{
+				ID:        edge.Node.ID,
+				PostID:    edge.Node.PostID,
+				ParentID:  edge.Node.ParentID,
+				Content:   edge.Node.Content,
+				CreatedAt: edge.Node.CreatedAt,
+			},
 		}
 
-		// Check if replies exist
-		if edge.Node.Replies == nil {
-			// If there are no replies, create an empty CommentConnection
-			commentEdges[i].Node.Replies = &model.CommentConnection{
-				Edges:    []*model.CommentEdge{},
-				PageInfo: &model.PageInfo{HasNextPage: false},
-			}
-		} else {
-			// If replies exist, copy them over
-			repliesEdges := make([]*model.CommentEdge, len(edge.Node.Replies.Edges))
-			for j, replyEdge := range edge.Node.Replies.Edges {
-				repliesEdges[j] = &model.CommentEdge{
+		// Load replies for the current comment
+		replies, err := r.Repo.GetRepliesByCommentID(edge.Node.ID, limit, nil) // nil is temp value to simplify a logic
+		if err != nil {
+			return nil, err
+		}
+
+		// Check if replies exist and have edges
+		if replies != nil && len(replies.Edges) > 0 {
+			replyEdges := make([]*model.CommentEdge, len(replies.Edges))
+			for j, replyEdge := range replies.Edges {
+				replyEdges[j] = &model.CommentEdge{
 					Cursor: replyEdge.Cursor,
-					Node:   replyEdge.Node,
+					Node: &model.Comment{
+						ID:        replyEdge.Node.ID,
+						PostID:    replyEdge.Node.PostID,
+						ParentID:  replyEdge.Node.ParentID,
+						Content:   replyEdge.Node.Content,
+						CreatedAt: replyEdge.Node.CreatedAt,
+					},
 				}
 			}
 
 			commentEdges[i].Node.Replies = &model.CommentConnection{
-				Edges:    repliesEdges,
-				PageInfo: edge.Node.Replies.PageInfo,
+				Edges:    replyEdges,
+				PageInfo: replies.PageInfo,
+			}
+		} else {
+			// If there are no replies, set an empty array
+			commentEdges[i].Node.Replies = &model.CommentConnection{
+				Edges:    []*model.CommentEdge{},
+				PageInfo: &model.PageInfo{HasNextPage: false},
 			}
 		}
 	}

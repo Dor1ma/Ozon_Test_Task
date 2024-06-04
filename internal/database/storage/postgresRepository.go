@@ -175,10 +175,10 @@ func (r *PostgreSQLRepository) CreateReply(postID string, content string, parent
 }
 
 func (r *PostgreSQLRepository) GetRepliesByCommentID(commentID string, limit int, after *string) (*model.CommentConnection, error) {
-	query := `SELECT c.id, c.post_id, c.content, c.created_at FROM comments c JOIN replies_comments rc ON c.id = rc.reply_comment_id WHERE rc.parent_comment_id = $1 ORDER BY c.id LIMIT $2`
+	query := `SELECT c.id, c.post_id, rc.parent_comment_id, c.content, c.created_at FROM comments c JOIN replies_comments rc ON c.id = rc.reply_comment_id WHERE rc.parent_comment_id = $1 ORDER BY c.id LIMIT $2`
 	args := []interface{}{commentID, limit}
 	if after != nil {
-		query = `SELECT c.id, c.post_id, c.content, c.created_at FROM comments c JOIN replies_comments rc ON c.id = rc.reply_comment_id WHERE rc.parent_comment_id = $1 AND c.id > $3 ORDER BY c.id LIMIT $2`
+		query = `SELECT c.id, c.post_id, rc.parent_comment_id, c.content, c.created_at FROM comments c JOIN replies_comments rc ON c.id = rc.reply_comment_id WHERE rc.parent_comment_id = $1 AND c.id > $3 ORDER BY c.id LIMIT $2`
 		args = append(args, *after)
 	}
 
@@ -189,11 +189,15 @@ func (r *PostgreSQLRepository) GetRepliesByCommentID(commentID string, limit int
 	defer rows.Close()
 
 	var replies []*model.Comment
+	var createdAt time.Time
+
 	for rows.Next() {
 		var reply model.Comment
-		if err := rows.Scan(&reply.ID, &reply.PostID, &reply.Content, &reply.CreatedAt); err != nil {
+		if err := rows.Scan(&reply.ID, &reply.PostID, &reply.ParentID, &reply.Content, &createdAt); err != nil {
 			return nil, err
 		}
+
+		reply.CreatedAt = createdAt.Format(time.RFC3339)
 		replies = append(replies, &reply)
 	}
 
@@ -205,12 +209,17 @@ func (r *PostgreSQLRepository) GetRepliesByCommentID(commentID string, limit int
 		}
 	}
 
+	var endCursor *string
+	if len(edges) > 0 {
+		endCursor = &edges[len(edges)-1].Cursor
+	}
+
 	hasNextPage := len(replies) == limit
 
 	return &model.CommentConnection{
 		Edges: edges,
 		PageInfo: &model.PageInfo{
-			EndCursor:   &edges[len(edges)-1].Cursor,
+			EndCursor:   endCursor,
 			HasNextPage: hasNextPage,
 		},
 	}, nil
