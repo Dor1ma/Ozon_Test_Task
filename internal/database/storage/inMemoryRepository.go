@@ -2,58 +2,82 @@ package storage
 
 import (
 	"errors"
-	"github.com/Dor1ma/Ozon_Test_Task/internal/database/models"
+	"github.com/Dor1ma/Ozon_Test_Task/pkg/graphql/model"
 	"strconv"
 	"sync"
 	"time"
 )
 
-// Имплементация репозитория для работы в режиме "in_memory"
-
 type InMemoryRepository struct {
-	posts     map[string]*models.Post
-	comments  map[string][]*models.Comment
-	postIDSeq int // Счетчик для генерации уникальных ID постов
-	mutex     sync.RWMutex
+	posts    map[string]*model.Post
+	comments map[string][]*model.Comment
+	mutex    sync.RWMutex
 }
 
 func NewInMemoryRepository() *InMemoryRepository {
 	return &InMemoryRepository{
-		posts:    make(map[string]*models.Post),
-		comments: make(map[string][]*models.Comment),
+		posts:    make(map[string]*model.Post),
+		comments: make(map[string][]*model.Comment),
 	}
 }
 
-func (r *InMemoryRepository) CreatePost(title, content string, allowComments bool) (*models.Post, error) {
+func (r *InMemoryRepository) CreatePost(title, content string, allowComments bool) (*model.Post, error) {
 	r.mutex.Lock()
 	defer r.mutex.Unlock()
 
-	post := &models.Post{
-		ID:            strconv.Itoa(r.postIDSeq),
+	post := &model.Post{
+		ID:            strconv.Itoa(len(r.posts) + 1),
 		Title:         title,
 		Content:       content,
 		AllowComments: allowComments,
+		Comments:      &model.CommentConnection{Edges: []*model.CommentEdge{}},
 	}
 
 	r.posts[post.ID] = post
-	r.postIDSeq++
 
 	return post, nil
 }
 
-func (r *InMemoryRepository) GetPosts() ([]*models.Post, error) {
+func (r *InMemoryRepository) GetPosts(limit int, after *string) (*model.PostConnection, error) {
 	r.mutex.RLock()
 	defer r.mutex.RUnlock()
 
-	posts := make([]*models.Post, 0, len(r.posts))
-	for _, post := range r.posts {
-		posts = append(posts, post)
+	posts := r.postsToSlice()
+
+	startIndex := 0
+	if after != nil {
+		startIndex = r.findIndex(*after, posts)
+		if startIndex == -1 {
+			return nil, errors.New("invalid cursor")
+		}
+		startIndex++
 	}
 
-	return posts, nil
+	endIndex := len(posts)
+	if limit > 0 && limit < len(posts)-startIndex {
+		endIndex = startIndex + limit
+	}
+
+	var edges []*model.PostEdge
+	for _, post := range posts[startIndex:endIndex] {
+		edges = append(edges, &model.PostEdge{
+			Cursor: post.ID,
+			Node:   post,
+		})
+	}
+
+	hasNextPage := endIndex < len(posts)
+
+	return &model.PostConnection{
+		Edges: edges,
+		PageInfo: &model.PageInfo{
+			EndCursor:   r.getEndCursor(posts[startIndex:endIndex]),
+			HasNextPage: hasNextPage,
+		},
+	}, nil
 }
 
-func (r *InMemoryRepository) GetPostByID(id string) (*models.Post, error) { // изменено: параметр и возвращаемое значение теперь string
+func (r *InMemoryRepository) GetPostByID(id string) (*model.Post, error) {
 	r.mutex.RLock()
 	defer r.mutex.RUnlock()
 
@@ -65,7 +89,7 @@ func (r *InMemoryRepository) GetPostByID(id string) (*models.Post, error) { // �
 	return post, nil
 }
 
-func (r *InMemoryRepository) CreateComment(postID string, content string, parentID *string) (*models.Comment, error) { // изменено: параметр теперь string
+func (r *InMemoryRepository) CreateComment(postID string, content string, parentID *string) (*model.Comment, error) {
 	r.mutex.Lock()
 	defer r.mutex.Unlock()
 
@@ -74,13 +98,13 @@ func (r *InMemoryRepository) CreateComment(postID string, content string, parent
 		return nil, errors.New("post not found")
 	}
 
-	comment := &models.Comment{
+	comment := &model.Comment{
 		ID:        strconv.Itoa(len(r.comments[postID]) + 1),
 		PostID:    postID,
 		ParentID:  parentID,
 		Content:   content,
-		CreatedAt: time.Now(),
-		Replies:   make([]*models.Comment, 0),
+		CreatedAt: time.Now().Format(time.RFC3339), // Форматирование времени
+		Replies:   &model.CommentConnection{Edges: []*model.CommentEdge{}},
 	}
 
 	r.comments[postID] = append(r.comments[postID], comment)
@@ -88,7 +112,7 @@ func (r *InMemoryRepository) CreateComment(postID string, content string, parent
 	return comment, nil
 }
 
-func (r *InMemoryRepository) GetComments(postID string) ([]*models.Comment, error) {
+func (r *InMemoryRepository) GetComments(postID string, limit int, after *string) (*model.CommentConnection, error) {
 	r.mutex.RLock()
 	defer r.mutex.RUnlock()
 
@@ -97,48 +121,130 @@ func (r *InMemoryRepository) GetComments(postID string) ([]*models.Comment, erro
 		return nil, errors.New("comments not found")
 	}
 
-	return comments, nil
+	startIndex := 0
+	if after != nil {
+		startIndex = r.findCommentIndex(*after, comments)
+		if startIndex == -1 {
+			return nil, errors.New("invalid cursor")
+		}
+		startIndex++
+	}
+
+	endIndex := len(comments)
+	if limit > 0 && limit < len(comments)-startIndex {
+		endIndex = startIndex + limit
+	}
+
+	var edges []*model.CommentEdge
+	for _, comment := range comments[startIndex:endIndex] {
+		edges = append(edges, &model.CommentEdge{
+			Cursor: comment.ID,
+			Node:   comment,
+		})
+	}
+
+	hasNextPage := endIndex < len(comments)
+
+	return &model.CommentConnection{
+		Edges: edges,
+		PageInfo: &model.PageInfo{
+			EndCursor:   r.getEndCursorComments(comments[startIndex:endIndex]),
+			HasNextPage: hasNextPage,
+		},
+	}, nil
 }
 
-func (r *InMemoryRepository) CreateReply(postID string, content string, parentID *string) (*models.Comment, error) {
+func (r *InMemoryRepository) CreateReply(postID string, content string, parentID *string) (*model.Comment, error) {
+	r.mutex.Lock()
+	defer r.mutex.Unlock()
+
+	comments, ok := r.comments[postID]
+	if !ok {
+		return nil, errors.New("post not found")
+	}
+
+	var parent *model.Comment
+	for _, c := range comments {
+		if c.ID == *parentID {
+			parent = c
+			break
+		}
+	}
+
+	if parent == nil {
+		return nil, errors.New("parent comment not found")
+	}
+
+	reply := &model.Comment{
+		ID:        strconv.Itoa(len(comments) + 1),
+		PostID:    postID,
+		ParentID:  parentID,
+		Content:   content,
+		CreatedAt: time.Now().Format(time.RFC3339),
+	}
+
+	parent.Replies.Edges = append(parent.Replies.Edges, &model.CommentEdge{
+		Cursor: reply.ID,
+		Node:   reply,
+	})
+
+	r.comments[postID] = append(comments, reply)
+
+	return reply, nil
+}
+
+func (r *InMemoryRepository) GetRepliesByCommentID(commentID string, limit int, after *string) (*model.CommentConnection, error) {
 	r.mutex.RLock()
 	defer r.mutex.RUnlock()
 
-	var comment *models.Comment
-
-	if _, ok := r.comments[postID]; ok {
-		comment = &models.Comment{
-			ID:        strconv.Itoa(len(r.comments[postID]) + 1),
-			PostID:    postID,
-			ParentID:  parentID,
-			Content:   content,
-			CreatedAt: time.Now(),
-			Replies:   make([]*models.Comment, 0),
-		}
-
-		for _, c := range r.comments[postID] {
-			if c.ParentID == parentID {
-				c.Replies = append(c.Replies, comment)
-				return comment, nil
+	var parentComment *model.Comment
+	for _, comments := range r.comments {
+		for _, comment := range comments {
+			if comment.ID == commentID {
+				parentComment = comment
+				break
 			}
 		}
-
-		return nil, errors.New("comment with equal parentID not found")
+		if parentComment != nil {
+			break
+		}
 	}
 
-	return nil, errors.New("comment not found")
-}
-
-func (r *InMemoryRepository) GetRepliesByPostID(postID string) ([]*models.Comment, error) {
-	r.mutex.RLock()
-	defer r.mutex.RUnlock()
-
-	var comments []*models.Comment
-
-	if _, ok := r.comments[postID]; ok {
-		comments = r.comments[postID]
-		return comments, errors.New("Replies with equal parentID not found")
+	if parentComment == nil {
+		return nil, errors.New("comment not found")
 	}
 
-	return nil, errors.New("comment not found")
+	replies := parentComment.Replies.Edges
+
+	startIndex := 0
+	if after != nil {
+		startIndex = r.findReplyIndex(*after, replies)
+		if startIndex == -1 {
+			return nil, errors.New("invalid cursor")
+		}
+		startIndex++
+	}
+
+	endIndex := len(replies)
+	if limit > 0 && limit < len(replies)-startIndex {
+		endIndex = startIndex + limit
+	}
+
+	var edges []*model.CommentEdge
+	for _, reply := range replies[startIndex:endIndex] {
+		edges = append(edges, &model.CommentEdge{
+			Cursor: reply.Cursor,
+			Node:   reply.Node,
+		})
+	}
+
+	hasNextPage := endIndex < len(replies)
+
+	return &model.CommentConnection{
+		Edges: edges,
+		PageInfo: &model.PageInfo{
+			EndCursor:   r.getEndCursorEdges(replies[startIndex:endIndex]),
+			HasNextPage: hasNextPage,
+		},
+	}, nil
 }

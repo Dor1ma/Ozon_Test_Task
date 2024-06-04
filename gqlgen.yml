@@ -13,14 +13,3 @@ resolver:
   layout: follow-schema
   dir: pkg/graphql
   package: graphql
-
-models:
-  ID:
-    model:
-      - github.com/99designs/gqlgen/graphql.ID
-  Post:
-    model:
-      - github.com/Dor1ma/Ozon_Test_Task/internal/database/models.Post
-  Comment:
-    model:
-      - github.com/Dor1ma/Ozon_Test_Task/internal/database/models.Comment

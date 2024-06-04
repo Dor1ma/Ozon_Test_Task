@@ -2,7 +2,7 @@ package graphql
 
 import (
 	"github.com/Dor1ma/Ozon_Test_Task/internal/database"
-	"github.com/Dor1ma/Ozon_Test_Task/internal/database/models"
+	"github.com/Dor1ma/Ozon_Test_Task/pkg/graphql/model"
 	"sync"
 )
 
@@ -12,6 +12,6 @@ import (
 
 type Resolver struct {
 	Repo             database.Repository
-	CommentObservers map[string]chan *models.Comment
+	CommentObservers map[string]chan *model.Comment
 	mu               sync.Mutex
 }
