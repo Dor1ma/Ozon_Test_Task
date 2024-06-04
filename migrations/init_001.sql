@@ -11,7 +11,7 @@ CREATE TABLE IF NOT EXISTS comments (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
     post_id UUID NOT NULL,
     content TEXT NOT NULL,
-    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+    created_at timestamptz NOT NULL DEFAULT (now() AT TIME ZONE 'utc'),
     FOREIGN KEY (post_id) REFERENCES posts(id)
 );
 

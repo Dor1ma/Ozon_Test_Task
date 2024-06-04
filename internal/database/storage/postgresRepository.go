@@ -82,23 +82,24 @@ func (r *PostgreSQLRepository) GetPostByID(id string) (*model.Post, error) {
 	return &post, nil
 }
 
-func (r *PostgreSQLRepository) CreateComment(postID, content string, parentID *string) (*model.Comment, error) {
-	query := `INSERT INTO comments (post_id, content, created_at) VALUES ($1, $2, $3) RETURNING id, post_id, content, created_at`
+func (r *PostgreSQLRepository) CreateComment(postID string, content string, parentID *string) (*model.Comment, error) {
+	query := `
+		INSERT INTO comments (post_id, content, created_at)
+		VALUES ($1, $2, $3)
+		RETURNING id, post_id, content, created_at
+	`
 
 	var comment model.Comment
+	var createdAt time.Time
+
 	err := r.db.QueryRow(context.Background(), query, postID, content, time.Now()).Scan(
-		&comment.ID, &comment.PostID, &comment.Content, &comment.CreatedAt,
+		&comment.ID, &comment.PostID, &comment.Content, &createdAt,
 	)
 	if err != nil {
 		return nil, err
 	}
 
-	if parentID != nil {
-		_, err = r.db.Exec(context.Background(), `INSERT INTO replies_comments (parent_comment_id, reply_comment_id) VALUES ($1, $2)`, *parentID, comment.ID)
-		if err != nil {
-			return nil, err
-		}
-	}
+	comment.CreatedAt = createdAt.Format(time.RFC3339)
 
 	return &comment, nil
 }
@@ -145,8 +146,30 @@ func (r *PostgreSQLRepository) GetComments(postID string, limit int, after *stri
 	}, nil
 }
 
-func (r *PostgreSQLRepository) CreateReply(postID, content string, parentID *string) (*model.Comment, error) {
-	return r.CreateComment(postID, content, parentID)
+func (r *PostgreSQLRepository) CreateReply(postID string, content string, parentID *string) (*model.Comment, error) {
+	comment, err := r.CreateComment(postID, content, parentID)
+	if err != nil {
+		return nil, err
+	}
+
+	query := `
+		INSERT INTO replies_comments (parent_comment_id, reply_comment_id)
+		VALUES ($1, $2)
+		RETURNING parent_comment_id
+		`
+
+	var createdAt time.Time
+
+	err = r.db.QueryRow(context.Background(), query, parentID, comment.ID).Scan(
+		&comment.ParentID,
+	)
+	if err != nil {
+		return nil, err
+	}
+
+	comment.CreatedAt = createdAt.Format(time.RFC3339)
+
+	return comment, nil
 }
 
 func (r *PostgreSQLRepository) GetRepliesByCommentID(commentID string, limit int, after *string) (*model.CommentConnection, error) {

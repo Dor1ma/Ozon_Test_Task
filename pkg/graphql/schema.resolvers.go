@@ -64,7 +64,7 @@ func (r *mutationResolver) CreateReply(ctx context.Context, postID string, paren
 
 // Posts is the resolver for the posts field.
 func (r *queryResolver) Posts(ctx context.Context, first *int, after *string) (*model.PostConnection, error) {
-	limit := 10 // default limit
+	limit := 10
 	if first != nil {
 		limit = *first
 	}
@@ -86,7 +86,6 @@ func (r *subscriptionResolver) CommentAdded(ctx context.Context, postID string) 
 	ch := make(chan *model.Comment, 1)
 	r.CommentObservers[postID] = ch
 
-	// Remove the channel from the map when context is canceled
 	go func() {
 		<-ctx.Done()
 		r.mu.Lock()
