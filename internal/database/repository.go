@@ -8,4 +8,6 @@ type Repository interface {
 	GetPostByID(id string) (*models.Post, error)
 	CreateComment(postID string, content string, parentID *string) (*models.Comment, error)
 	GetComments(postID string) ([]*models.Comment, error)
+	CreateReply(postID string, content string, parentID *string) (*models.Comment, error)
+	GetRepliesByCommentID(postID string) ([]*models.Comment, error)
 }

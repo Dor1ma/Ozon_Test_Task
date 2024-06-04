@@ -7,13 +7,18 @@ CREATE TABLE IF NOT EXISTS posts (
     allow_comments BOOLEAN NOT NULL
 );
 
-
 CREATE TABLE IF NOT EXISTS comments (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
     post_id UUID NOT NULL,
-    parent_id UUID,
     content TEXT NOT NULL,
     created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
-    FOREIGN KEY (post_id) REFERENCES posts(id),
-    FOREIGN KEY (parent_id) REFERENCES comments(id)
+    FOREIGN KEY (post_id) REFERENCES posts(id)
+);
+
+CREATE TABLE IF NOT EXISTS replies_comments (
+    parent_comment_id UUID NOT NULL,
+    reply_comment_id UUID NOT NULL,
+    PRIMARY KEY (parent_comment_id, reply_comment_id),
+    FOREIGN KEY (parent_comment_id) REFERENCES comments(id),
+    FOREIGN KEY (reply_comment_id) REFERENCES comments(id)
 );

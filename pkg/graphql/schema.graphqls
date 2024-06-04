@@ -21,7 +21,8 @@ type Query {
 
 type Mutation {
   createPost(title: String!, content: String!, allowComments: Boolean!): Post!
-  createComment(postId: ID!, content: String!, parentId: ID): Comment!
+  createComment(postId: ID!, content: String!): Comment!
+  createReply(postId: ID!, content: String!, parentID: ID!): Comment!
 }
 
 type Subscription {
