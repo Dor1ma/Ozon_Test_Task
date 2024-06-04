@@ -32,6 +32,8 @@ type Comment {
 
 type Query {
   posts(first: Int, after: String): PostConnection!
+  post(id: ID!): Post
+  comments(postId: ID!, first: Int, after: String): CommentConnection!
 }
 
 type PostConnection {

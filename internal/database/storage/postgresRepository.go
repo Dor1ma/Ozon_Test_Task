@@ -119,11 +119,13 @@ func (r *PostgreSQLRepository) GetComments(postID string, limit int, after *stri
 	defer rows.Close()
 
 	var comments []*model.Comment
+	var createdAt time.Time
 	for rows.Next() {
 		var comment model.Comment
-		if err := rows.Scan(&comment.ID, &comment.PostID, &comment.Content, &comment.CreatedAt); err != nil {
+		if err := rows.Scan(&comment.ID, &comment.PostID, &comment.Content, &createdAt); err != nil {
 			return nil, err
 		}
+		comment.CreatedAt = createdAt.Format(time.RFC3339)
 		comments = append(comments, &comment)
 	}
 

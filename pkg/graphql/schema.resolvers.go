@@ -7,6 +7,7 @@ package graphql
 import (
 	"context"
 	"github.com/Dor1ma/Ozon_Test_Task/internal/database"
+
 	"github.com/Dor1ma/Ozon_Test_Task/pkg/graphql/model"
 )
 
@@ -77,12 +78,71 @@ func (r *queryResolver) Posts(ctx context.Context, first *int, after *string) (*
 	return postConnection, nil
 }
 
+// Post is the resolver for the post field.
+func (r *queryResolver) Post(ctx context.Context, id string) (*model.Post, error) {
+	post, err := r.Repo.GetPostByID(id)
+	if err != nil {
+		return nil, err
+	}
+	return post, nil
+}
+
+// Comments is the resolver for the comments field.
+func (r *queryResolver) Comments(ctx context.Context, postID string, first *int, after *string) (*model.CommentConnection, error) {
+	limit := 10
+	if first != nil {
+		limit = *first
+	}
+
+	comments, err := r.Repo.GetComments(postID, limit, after)
+	if err != nil {
+		return nil, err
+	}
+
+	commentEdges := make([]*model.CommentEdge, len(comments.Edges))
+	for i, edge := range comments.Edges {
+		commentEdges[i] = &model.CommentEdge{
+			Cursor: edge.Cursor,
+			Node:   edge.Node,
+		}
+
+		// Check if replies exist
+		if edge.Node.Replies == nil {
+			// If there are no replies, create an empty CommentConnection
+			commentEdges[i].Node.Replies = &model.CommentConnection{
+				Edges:    []*model.CommentEdge{},
+				PageInfo: &model.PageInfo{HasNextPage: false},
+			}
+		} else {
+			// If replies exist, copy them over
+			repliesEdges := make([]*model.CommentEdge, len(edge.Node.Replies.Edges))
+			for j, replyEdge := range edge.Node.Replies.Edges {
+				repliesEdges[j] = &model.CommentEdge{
+					Cursor: replyEdge.Cursor,
+					Node:   replyEdge.Node,
+				}
+			}
+
+			commentEdges[i].Node.Replies = &model.CommentConnection{
+				Edges:    repliesEdges,
+				PageInfo: edge.Node.Replies.PageInfo,
+			}
+		}
+	}
+
+	commentConnection := &model.CommentConnection{
+		Edges:    commentEdges,
+		PageInfo: comments.PageInfo,
+	}
+
+	return commentConnection, nil
+}
+
 // CommentAdded is the resolver for the commentAdded field.
 func (r *subscriptionResolver) CommentAdded(ctx context.Context, postID string) (<-chan *model.Comment, error) {
 	r.mu.Lock()
 	defer r.mu.Unlock()
 
-	// Create a channel for subscribing to new comments
 	ch := make(chan *model.Comment, 1)
 	r.CommentObservers[postID] = ch
 
