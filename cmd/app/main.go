@@ -3,19 +3,19 @@ package main
 import (
 	"context"
 	"fmt"
-	"github.com/99designs/gqlgen/graphql/handler/extension"
-	"github.com/99designs/gqlgen/graphql/handler/transport"
-	"github.com/Dor1ma/Ozon_Test_Task/internal/database"
-	"github.com/gorilla/websocket"
+	"github.com/Dor1ma/Ozon_Test_Task/pkg/graphql"
 	"log"
 	"net/http"
 	"os"
 	"time"
 
 	"github.com/99designs/gqlgen/graphql/handler"
+	"github.com/99designs/gqlgen/graphql/handler/extension"
+	"github.com/99designs/gqlgen/graphql/handler/transport"
 	"github.com/99designs/gqlgen/graphql/playground"
+	"github.com/Dor1ma/Ozon_Test_Task/internal/database"
 	"github.com/Dor1ma/Ozon_Test_Task/internal/database/storage"
-	"github.com/Dor1ma/Ozon_Test_Task/pkg/graphql"
+	"github.com/gorilla/websocket"
 	"github.com/jackc/pgx/v4"
 	"github.com/joho/godotenv"
 )
@@ -47,6 +47,11 @@ func main() {
 	}
 
 	if storageType == "postgres" {
+		err = waitForDatabase(dbUser, dbPassword, dbName, dbHost, dbPort)
+		if err != nil {
+			log.Fatalf("Error waiting for database: %v", err)
+		}
+
 		connStr := fmt.Sprintf("user=%s password=%s dbname=%s host=%s port=%s sslmode=disable",
 			dbUser, dbPassword, dbName, dbHost, dbPort)
 
@@ -87,4 +92,27 @@ func main() {
 
 	log.Printf("connect to http://localhost:%s/ for GraphQL playground", port)
 	log.Fatal(http.ListenAndServe(":"+port, nil))
+}
+
+func waitForDatabase(user, password, dbName, host, port string) error {
+	connStr := fmt.Sprintf("user=%s password=%s dbname=%s host=%s port=%s sslmode=disable",
+		user, password, dbName, host, port)
+
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+
+	for {
+		select {
+		case <-ctx.Done():
+			return fmt.Errorf("timed out waiting for database to become available: %v", ctx.Err())
+		default:
+			db, err := pgx.Connect(ctx, connStr)
+			if err == nil {
+				db.Close(ctx)
+				return nil
+			}
+			log.Printf("waiting for database to become available on %s:%s - %v", host, port, err)
+			time.Sleep(1 * time.Second)
+		}
+	}
 }
