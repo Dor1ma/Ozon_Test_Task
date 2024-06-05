@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"github.com/99designs/gqlgen/graphql/handler/extension"
 	"github.com/99designs/gqlgen/graphql/handler/transport"
+	"github.com/Dor1ma/Ozon_Test_Task/internal/database"
 	"github.com/gorilla/websocket"
 	"log"
 	"net/http"
@@ -37,17 +38,30 @@ func main() {
 	dbName := os.Getenv("DB_NAME")
 	dbHost := os.Getenv("DB_HOST")
 	dbPort := os.Getenv("DB_PORT")
+	storageType := os.Getenv("STORAGE_TYPE")
 
-	connStr := fmt.Sprintf("user=%s password=%s dbname=%s host=%s port=%s sslmode=disable",
-		dbUser, dbPassword, dbName, dbHost, dbPort)
+	var repo database.Repository
 
-	db, err := pgx.Connect(context.Background(), connStr)
-	if err != nil {
-		log.Fatalf("failed to connect to the database: %v", err)
+	if storageType == "" {
+		log.Fatalf("Error: STORAGE_TYPE environment variable not set")
 	}
-	defer db.Close(context.Background())
 
-	repo := storage.NewInMemoryRepository()
+	if storageType == "postgres" {
+		connStr := fmt.Sprintf("user=%s password=%s dbname=%s host=%s port=%s sslmode=disable",
+			dbUser, dbPassword, dbName, dbHost, dbPort)
+
+		db, err := pgx.Connect(context.Background(), connStr)
+		if err != nil {
+			log.Fatalf("failed to connect to the database: %v", err)
+		}
+		defer db.Close(context.Background())
+
+		repo = storage.NewPostgreSQLRepository(db)
+
+	} else if storageType == "in_memory" {
+		repo = storage.NewInMemoryRepository()
+	}
+
 	resolver := graphql.NewResolver(repo)
 
 	srv := handler.NewDefaultServer(graphql.NewExecutableSchema(graphql.Config{Resolvers: resolver}))
