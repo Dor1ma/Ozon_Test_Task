@@ -15,3 +15,10 @@ type Resolver struct {
 	CommentObservers map[string]chan *model.Comment
 	mu               sync.Mutex
 }
+
+func NewResolver(Repo database.Repository) *Resolver {
+	return &Resolver{
+		Repo:             Repo,
+		CommentObservers: make(map[string]chan *model.Comment),
+	}
+}

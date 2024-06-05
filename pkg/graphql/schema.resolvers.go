@@ -7,17 +7,9 @@ package graphql
 import (
 	"context"
 	"fmt"
-	"github.com/Dor1ma/Ozon_Test_Task/internal/database"
 
 	"github.com/Dor1ma/Ozon_Test_Task/pkg/graphql/model"
 )
-
-func NewResolver(Repo database.Repository) *Resolver {
-	return &Resolver{
-		Repo:             Repo,
-		CommentObservers: make(map[string]chan *model.Comment),
-	}
-}
 
 // CreatePost is the resolver for the createPost field.
 func (r *mutationResolver) CreatePost(ctx context.Context, authorID string, title string, content string, allowComments bool) (*model.Post, error) {

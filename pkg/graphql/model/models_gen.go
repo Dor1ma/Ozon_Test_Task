@@ -31,12 +31,11 @@ type PageInfo struct {
 }
 
 type Post struct {
-	ID            string             `json:"id"`
-	AuthorID      string             `json:"authorId"`
-	Title         string             `json:"title"`
-	Content       string             `json:"content"`
-	AllowComments bool               `json:"allowComments"`
-	Comments      *CommentConnection `json:"comments"`
+	ID            string `json:"id"`
+	AuthorID      string `json:"authorId"`
+	Title         string `json:"title"`
+	Content       string `json:"content"`
+	AllowComments bool   `json:"allowComments"`
 }
 
 type PostConnection struct {

@@ -4,7 +4,6 @@ type Post {
   title: String!
   content: String!
   allowComments: Boolean!
-  comments(first: Int, after: String): CommentConnection!
 }
 
 type CommentConnection {

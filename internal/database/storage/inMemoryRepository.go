@@ -31,7 +31,6 @@ func (r *InMemoryRepository) CreatePost(authorID, title, content string, allowCo
 		Title:         title,
 		Content:       content,
 		AllowComments: allowComments,
-		Comments:      &model.CommentConnection{Edges: []*model.CommentEdge{}},
 	}
 
 	r.posts[post.ID] = post

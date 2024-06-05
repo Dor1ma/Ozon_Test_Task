@@ -85,7 +85,7 @@ func (r *PostgreSQLRepository) GetPostByID(id string) (*model.Post, error) {
 
 func (r *PostgreSQLRepository) CreateComment(authorID, postID string, content string) (*model.Comment, error) {
 	query := `
-		INSERT INTO comments (post_id, author_id, content, created_at)
+		INSERT INTO comments (author_id, post_id, content, created_at)
 		VALUES ($1, $2, $3, $4)
 		RETURNING id, author_id, post_id, content, created_at
 	`
@@ -93,7 +93,7 @@ func (r *PostgreSQLRepository) CreateComment(authorID, postID string, content st
 	var comment model.Comment
 	var createdAt time.Time
 
-	err := r.db.QueryRow(context.Background(), query, postID, content, time.Now()).Scan(
+	err := r.db.QueryRow(context.Background(), query, authorID, postID, content, time.Now()).Scan(
 		&comment.ID, &comment.AuthorID, &comment.PostID, &comment.Content, &createdAt,
 	)
 	if err != nil {
