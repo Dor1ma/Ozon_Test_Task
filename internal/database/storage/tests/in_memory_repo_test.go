@@ -25,7 +25,6 @@ func TestCreatePost(t *testing.T) {
 func TestGetPosts(t *testing.T) {
 	repo := storage.NewInMemoryRepository()
 
-	// Создаем несколько постов
 	repo.CreatePost("1", "Title1", "Content1", true)
 	repo.CreatePost("2", "Title2", "Content2", false)
 
@@ -119,7 +118,6 @@ func TestGetPostsWithPagination(t *testing.T) {
 	repo.CreatePost("2", "Title2", "Content2", false)
 	repo.CreatePost("3", "Title3", "Content3", true)
 
-	// Получение первой страницы
 	conn, err := repo.GetPosts(2, nil)
 
 	assert.NoError(t, err)
@@ -127,7 +125,6 @@ func TestGetPostsWithPagination(t *testing.T) {
 	assert.Equal(t, "Title1", conn.Edges[0].Node.Title)
 	assert.Equal(t, "Title2", conn.Edges[1].Node.Title)
 
-	// Получение второй страницы
 	after := conn.PageInfo.EndCursor
 	conn, err = repo.GetPosts(2, after)
 
@@ -144,7 +141,6 @@ func TestGetCommentsWithPagination(t *testing.T) {
 	repo.CreateComment("3", post.ID, "I agree!")
 	repo.CreateComment("4", post.ID, "Thanks!")
 
-	// Получение первой страницы
 	conn, err := repo.GetComments(post.ID, 2, nil)
 
 	assert.NoError(t, err)
@@ -152,7 +148,6 @@ func TestGetCommentsWithPagination(t *testing.T) {
 	assert.Equal(t, "Nice post!", conn.Edges[0].Node.Content)
 	assert.Equal(t, "I agree!", conn.Edges[1].Node.Content)
 
-	// Получение второй страницы
 	after := conn.PageInfo.EndCursor
 	conn, err = repo.GetComments(post.ID, 2, after)
 
