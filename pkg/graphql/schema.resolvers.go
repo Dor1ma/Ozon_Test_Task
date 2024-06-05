@@ -106,6 +106,47 @@ func (r *queryResolver) Post(ctx context.Context, id string) (*model.Post, error
 	return post, nil
 }
 
+// Recursively load comments with nested replies
+func (r *queryResolver) loadNestedComments(ctx context.Context, comment *model.Comment, limit int) error {
+	replies, err := r.Repo.GetRepliesByCommentID(comment.ID, limit, nil)
+	if err != nil {
+		return err
+	}
+
+	if replies != nil && len(replies.Edges) > 0 {
+		replyEdges := make([]*model.CommentEdge, len(replies.Edges))
+		for j, replyEdge := range replies.Edges {
+			replyEdges[j] = &model.CommentEdge{
+				Cursor: replyEdge.Cursor,
+				Node: &model.Comment{
+					ID:        replyEdge.Node.ID,
+					AuthorID:  replyEdge.Node.AuthorID,
+					PostID:    replyEdge.Node.PostID,
+					ParentID:  replyEdge.Node.ParentID,
+					Content:   replyEdge.Node.Content,
+					CreatedAt: replyEdge.Node.CreatedAt,
+				},
+			}
+
+			// Recursively load nested replies
+			if err := r.loadNestedComments(ctx, replyEdges[j].Node, limit); err != nil {
+				return err
+			}
+		}
+
+		comment.Replies = &model.CommentConnection{
+			Edges:    replyEdges,
+			PageInfo: replies.PageInfo,
+		}
+	} else {
+		comment.Replies = &model.CommentConnection{
+			Edges:    []*model.CommentEdge{},
+			PageInfo: &model.PageInfo{HasNextPage: false},
+		}
+	}
+	return nil
+}
+
 // Comments is the resolver for the comments field.
 func (r *queryResolver) Comments(ctx context.Context, postID string, first *int, after *string) (*model.CommentConnection, error) {
 	limit := 10
@@ -132,39 +173,9 @@ func (r *queryResolver) Comments(ctx context.Context, postID string, first *int,
 			},
 		}
 
-		// Load replies for the current comment
-		replies, err := r.Repo.GetRepliesByCommentID(edge.Node.ID, limit, nil) // nil is temp value to simplify a logic
-		if err != nil {
+		// Recursively load nested replies
+		if err := r.loadNestedComments(ctx, commentEdges[i].Node, limit); err != nil {
 			return nil, err
-		}
-
-		// Check if replies exist and have edges
-		if replies != nil && len(replies.Edges) > 0 {
-			replyEdges := make([]*model.CommentEdge, len(replies.Edges))
-			for j, replyEdge := range replies.Edges {
-				replyEdges[j] = &model.CommentEdge{
-					Cursor: replyEdge.Cursor,
-					Node: &model.Comment{
-						ID:        replyEdge.Node.ID,
-						AuthorID:  replyEdge.Node.AuthorID,
-						PostID:    replyEdge.Node.PostID,
-						ParentID:  replyEdge.Node.ParentID,
-						Content:   replyEdge.Node.Content,
-						CreatedAt: replyEdge.Node.CreatedAt,
-					},
-				}
-			}
-
-			commentEdges[i].Node.Replies = &model.CommentConnection{
-				Edges:    replyEdges,
-				PageInfo: replies.PageInfo,
-			}
-		} else {
-			// If there are no replies, set an empty array
-			commentEdges[i].Node.Replies = &model.CommentConnection{
-				Edges:    []*model.CommentEdge{},
-				PageInfo: &model.PageInfo{HasNextPage: false},
-			}
 		}
 	}
 

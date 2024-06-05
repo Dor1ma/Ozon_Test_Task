@@ -60,12 +60,18 @@ func (r *PostgreSQLRepository) GetPosts(limit int, after *string) (*model.PostCo
 		}
 	}
 
+	var endCursor *string
+
+	if len(edges) > 0 {
+		endCursor = &edges[len(edges)-1].Cursor
+	}
+
 	hasNextPage := len(posts) == limit
 
 	return &model.PostConnection{
 		Edges: edges,
 		PageInfo: &model.PageInfo{
-			EndCursor:   &edges[len(edges)-1].Cursor,
+			EndCursor:   endCursor,
 			HasNextPage: hasNextPage,
 		},
 	}, nil
