@@ -21,12 +21,13 @@ func NewInMemoryRepository() *InMemoryRepository {
 	}
 }
 
-func (r *InMemoryRepository) CreatePost(title, content string, allowComments bool) (*model.Post, error) {
+func (r *InMemoryRepository) CreatePost(authorID, title, content string, allowComments bool) (*model.Post, error) {
 	r.mutex.Lock()
 	defer r.mutex.Unlock()
 
 	post := &model.Post{
 		ID:            strconv.Itoa(len(r.posts) + 1),
+		AuthorID:      authorID,
 		Title:         title,
 		Content:       content,
 		AllowComments: allowComments,
@@ -89,7 +90,7 @@ func (r *InMemoryRepository) GetPostByID(id string) (*model.Post, error) {
 	return post, nil
 }
 
-func (r *InMemoryRepository) CreateComment(postID string, content string, parentID *string) (*model.Comment, error) {
+func (r *InMemoryRepository) CreateComment(authorID, postID string, content string) (*model.Comment, error) {
 	r.mutex.Lock()
 	defer r.mutex.Unlock()
 
@@ -100,8 +101,8 @@ func (r *InMemoryRepository) CreateComment(postID string, content string, parent
 
 	comment := &model.Comment{
 		ID:        strconv.Itoa(len(r.comments[postID]) + 1),
+		AuthorID:  authorID,
 		PostID:    postID,
-		ParentID:  parentID,
 		Content:   content,
 		CreatedAt: time.Now().Format(time.RFC3339), // Форматирование времени
 		Replies:   &model.CommentConnection{Edges: []*model.CommentEdge{}},
@@ -154,7 +155,7 @@ func (r *InMemoryRepository) GetComments(postID string, limit int, after *string
 	}, nil
 }
 
-func (r *InMemoryRepository) CreateReply(postID string, content string, parentID *string) (*model.Comment, error) {
+func (r *InMemoryRepository) CreateReply(authorID, postID string, content string, parentID *string) (*model.Comment, error) {
 	r.mutex.Lock()
 	defer r.mutex.Unlock()
 
@@ -177,6 +178,7 @@ func (r *InMemoryRepository) CreateReply(postID string, content string, parentID
 
 	reply := &model.Comment{
 		ID:        strconv.Itoa(len(comments) + 1),
+		AuthorID:  authorID,
 		PostID:    postID,
 		ParentID:  parentID,
 		Content:   content,

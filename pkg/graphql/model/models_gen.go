@@ -4,6 +4,7 @@ package model
 
 type Comment struct {
 	ID        string             `json:"id"`
+	AuthorID  string             `json:"authorId"`
 	PostID    string             `json:"postId"`
 	ParentID  *string            `json:"parentId,omitempty"`
 	Content   string             `json:"content"`
@@ -31,6 +32,7 @@ type PageInfo struct {
 
 type Post struct {
 	ID            string             `json:"id"`
+	AuthorID      string             `json:"authorId"`
 	Title         string             `json:"title"`
 	Content       string             `json:"content"`
 	AllowComments bool               `json:"allowComments"`

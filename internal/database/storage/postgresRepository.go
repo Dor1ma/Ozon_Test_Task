@@ -15,12 +15,13 @@ func NewPostgreSQLRepository(db *pgx.Conn) *PostgreSQLRepository {
 	return &PostgreSQLRepository{db: db}
 }
 
-func (r *PostgreSQLRepository) CreatePost(title, content string, allowComments bool) (*model.Post, error) {
-	query := `INSERT INTO posts (title, content, allow_comments) VALUES ($1, $2, $3) RETURNING id, title, content, allow_comments`
+func (r *PostgreSQLRepository) CreatePost(authorID, title, content string, allowComments bool) (*model.Post, error) {
+	query := `INSERT INTO posts (author_id, title, content, allow_comments) 
+			  VALUES ($1, $2, $3, $4) RETURNING id, author_id, title, content, allow_comments`
 
 	var post model.Post
-	err := r.db.QueryRow(context.Background(), query, title, content, allowComments).Scan(
-		&post.ID, &post.Title, &post.Content, &post.AllowComments,
+	err := r.db.QueryRow(context.Background(), query, authorID, title, content, allowComments).Scan(
+		&post.ID, &post.AuthorID, &post.Title, &post.Content, &post.AllowComments,
 	)
 	if err != nil {
 		return nil, err
@@ -29,10 +30,10 @@ func (r *PostgreSQLRepository) CreatePost(title, content string, allowComments b
 }
 
 func (r *PostgreSQLRepository) GetPosts(limit int, after *string) (*model.PostConnection, error) {
-	query := `SELECT id, title, content, allow_comments FROM posts ORDER BY id LIMIT $1`
+	query := `SELECT id, author_id ,title, content, allow_comments FROM posts ORDER BY id LIMIT $1`
 	args := []interface{}{limit}
 	if after != nil {
-		query = `SELECT id, title, content, allow_comments FROM posts WHERE id > $2 ORDER BY id LIMIT $1`
+		query = `SELECT id, author_id, title, content, allow_comments FROM posts WHERE id > $2 ORDER BY id LIMIT $1`
 		args = append(args, *after)
 	}
 
@@ -45,7 +46,7 @@ func (r *PostgreSQLRepository) GetPosts(limit int, after *string) (*model.PostCo
 	var posts []*model.Post
 	for rows.Next() {
 		var post model.Post
-		if err := rows.Scan(&post.ID, &post.Title, &post.Content, &post.AllowComments); err != nil {
+		if err := rows.Scan(&post.ID, &post.AuthorID, &post.Title, &post.Content, &post.AllowComments); err != nil {
 			return nil, err
 		}
 		posts = append(posts, &post)
@@ -71,10 +72,10 @@ func (r *PostgreSQLRepository) GetPosts(limit int, after *string) (*model.PostCo
 }
 
 func (r *PostgreSQLRepository) GetPostByID(id string) (*model.Post, error) {
-	query := `SELECT id, title, content, allow_comments FROM posts WHERE id = $1`
+	query := `SELECT id, author_id, title, content, allow_comments FROM posts WHERE id = $1`
 	var post model.Post
 	err := r.db.QueryRow(context.Background(), query, id).Scan(
-		&post.ID, &post.Title, &post.Content, &post.AllowComments,
+		&post.ID, &post.AuthorID, &post.Title, &post.Content, &post.AllowComments,
 	)
 	if err != nil {
 		return nil, err
@@ -82,18 +83,18 @@ func (r *PostgreSQLRepository) GetPostByID(id string) (*model.Post, error) {
 	return &post, nil
 }
 
-func (r *PostgreSQLRepository) CreateComment(postID string, content string, parentID *string) (*model.Comment, error) {
+func (r *PostgreSQLRepository) CreateComment(authorID, postID string, content string) (*model.Comment, error) {
 	query := `
-		INSERT INTO comments (post_id, content, created_at)
-		VALUES ($1, $2, $3)
-		RETURNING id, post_id, content, created_at
+		INSERT INTO comments (post_id, author_id, content, created_at)
+		VALUES ($1, $2, $3, $4)
+		RETURNING id, author_id, post_id, content, created_at
 	`
 
 	var comment model.Comment
 	var createdAt time.Time
 
 	err := r.db.QueryRow(context.Background(), query, postID, content, time.Now()).Scan(
-		&comment.ID, &comment.PostID, &comment.Content, &createdAt,
+		&comment.ID, &comment.AuthorID, &comment.PostID, &comment.Content, &createdAt,
 	)
 	if err != nil {
 		return nil, err
@@ -105,10 +106,10 @@ func (r *PostgreSQLRepository) CreateComment(postID string, content string, pare
 }
 
 func (r *PostgreSQLRepository) GetComments(postID string, limit int, after *string) (*model.CommentConnection, error) {
-	query := `SELECT id, post_id, content, created_at FROM comments WHERE post_id = $1 ORDER BY id LIMIT $2`
+	query := `SELECT id, author_id, post_id, content, created_at FROM comments WHERE post_id = $1 ORDER BY id LIMIT $2`
 	args := []interface{}{postID, limit}
 	if after != nil {
-		query = `SELECT id, post_id, content, created_at FROM comments WHERE post_id = $1 AND id > $3 ORDER BY id LIMIT $2`
+		query = `SELECT id, author_id, post_id, content, created_at FROM comments WHERE post_id = $1 AND id > $3 ORDER BY id LIMIT $2`
 		args = append(args, *after)
 	}
 
@@ -122,7 +123,7 @@ func (r *PostgreSQLRepository) GetComments(postID string, limit int, after *stri
 	var createdAt time.Time
 	for rows.Next() {
 		var comment model.Comment
-		if err := rows.Scan(&comment.ID, &comment.PostID, &comment.Content, &createdAt); err != nil {
+		if err := rows.Scan(&comment.ID, &comment.AuthorID, &comment.PostID, &comment.Content, &createdAt); err != nil {
 			return nil, err
 		}
 		comment.CreatedAt = createdAt.Format(time.RFC3339)
@@ -137,19 +138,24 @@ func (r *PostgreSQLRepository) GetComments(postID string, limit int, after *stri
 		}
 	}
 
+	var endCursor *string
+	if len(edges) > 0 {
+		endCursor = &edges[len(edges)-1].Cursor
+	}
+
 	hasNextPage := len(comments) == limit
 
 	return &model.CommentConnection{
 		Edges: edges,
 		PageInfo: &model.PageInfo{
-			EndCursor:   &edges[len(edges)-1].Cursor,
+			EndCursor:   endCursor,
 			HasNextPage: hasNextPage,
 		},
 	}, nil
 }
 
-func (r *PostgreSQLRepository) CreateReply(postID string, content string, parentID *string) (*model.Comment, error) {
-	comment, err := r.CreateComment(postID, content, parentID)
+func (r *PostgreSQLRepository) CreateReply(authorID, postID string, content string, parentID *string) (*model.Comment, error) {
+	comment, err := r.CreateComment(authorID, postID, content)
 	if err != nil {
 		return nil, err
 	}
@@ -175,10 +181,14 @@ func (r *PostgreSQLRepository) CreateReply(postID string, content string, parent
 }
 
 func (r *PostgreSQLRepository) GetRepliesByCommentID(commentID string, limit int, after *string) (*model.CommentConnection, error) {
-	query := `SELECT c.id, c.post_id, rc.parent_comment_id, c.content, c.created_at FROM comments c JOIN replies_comments rc ON c.id = rc.reply_comment_id WHERE rc.parent_comment_id = $1 ORDER BY c.id LIMIT $2`
+	query := `SELECT c.id, c.author_id, c.post_id, rc.parent_comment_id, c.content, c.created_at
+			  FROM comments c JOIN replies_comments rc ON c.id = rc.reply_comment_id
+			  WHERE rc.parent_comment_id = $1 ORDER BY c.id LIMIT $2`
 	args := []interface{}{commentID, limit}
 	if after != nil {
-		query = `SELECT c.id, c.post_id, rc.parent_comment_id, c.content, c.created_at FROM comments c JOIN replies_comments rc ON c.id = rc.reply_comment_id WHERE rc.parent_comment_id = $1 AND c.id > $3 ORDER BY c.id LIMIT $2`
+		query = `SELECT c.id, c.author_id, c.post_id, rc.parent_comment_id, c.content, c.created_at
+				 FROM comments c JOIN replies_comments rc ON c.id = rc.reply_comment_id
+				 WHERE rc.parent_comment_id = $1 AND c.id > $3 ORDER BY c.id LIMIT $2`
 		args = append(args, *after)
 	}
 
@@ -193,7 +203,7 @@ func (r *PostgreSQLRepository) GetRepliesByCommentID(commentID string, limit int
 
 	for rows.Next() {
 		var reply model.Comment
-		if err := rows.Scan(&reply.ID, &reply.PostID, &reply.ParentID, &reply.Content, &createdAt); err != nil {
+		if err := rows.Scan(&reply.ID, &reply.AuthorID, &reply.PostID, &reply.ParentID, &reply.Content, &createdAt); err != nil {
 			return nil, err
 		}
 

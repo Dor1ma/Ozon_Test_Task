@@ -1,5 +1,6 @@
 type Post {
   id: ID!
+  authorId: ID!
   title: String!
   content: String!
   allowComments: Boolean!
@@ -23,6 +24,7 @@ type PageInfo {
 
 type Comment {
   id: ID!
+  authorId: ID!
   postId: ID!
   parentId: ID
   content: String!
@@ -47,9 +49,9 @@ type PostEdge {
 }
 
 type Mutation {
-  createPost(title: String!, content: String!, allowComments: Boolean!): Post!
-  createComment(postId: ID!, content: String!, parentId: ID): Comment!
-  createReply(postId: ID!, parentId: ID!, content: String!): Comment!
+  createPost(authorId: ID!, title: String!, content: String!, allowComments: Boolean!): Post!
+  createComment(authorId: ID! postId: ID!, content: String!): Comment!
+  createReply(authorId: ID!, postId: ID!, parentId: ID!, content: String!): Comment!
 }
 
 type Subscription {
