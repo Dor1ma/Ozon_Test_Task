@@ -1,25 +1,31 @@
+# Укажите базовый образ Go
 FROM golang:1.21.1-alpine AS builder
 
-RUN apk update && apk add --no-cache git postgresql-client
+# Установим необходимые пакеты
+RUN apk update && apk add --no-cache git
 
-RUN go install -tags 'postgres' github.com/golang-migrate/migrate/v4/cmd/migrate@latest
-
+# Создадим рабочую директорию
 WORKDIR /app
 
+# Скопируем исходный код
 COPY . .
 
+# Соберем Go-приложение
 RUN go build -o main ./cmd/app
 
+# Базовый образ для финального контейнера
 FROM alpine:latest
 
-RUN apk --no-cache add ca-certificates postgresql-client
+# Установим необходимые пакеты
+RUN apk --no-cache add ca-certificates
 
+# Создадим рабочую директорию
 WORKDIR /root/
 
+# Скопируем бинарный файл
 COPY --from=builder /app/main .
-COPY --from=builder /app/migrations /migrations
-COPY --from=builder /app/migrations/init_001.sql /init.sql
 
-CMD until pg_isready -h ${DB_HOST} -p ${DB_PORT} -U ${DB_USER}; do sleep 1; done && \
-    psql -h ${DB_HOST} -U ${DB_USER} -d ${DB_NAME} -f /init.sql && \
-    ./main
+COPY .env .
+
+# Запуск приложения
+CMD ./main
