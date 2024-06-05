@@ -2,16 +2,16 @@ package storage
 
 import (
 	"context"
+	"github.com/Dor1ma/Ozon_Test_Task/internal/database"
 	"github.com/Dor1ma/Ozon_Test_Task/pkg/graphql/model"
-	"github.com/jackc/pgx/v4"
 	"time"
 )
 
 type PostgreSQLRepository struct {
-	db *pgx.Conn
+	db database.Database
 }
 
-func NewPostgreSQLRepository(db *pgx.Conn) *PostgreSQLRepository {
+func NewPostgreSQLRepository(db database.Database) *PostgreSQLRepository {
 	return &PostgreSQLRepository{db: db}
 }
 
