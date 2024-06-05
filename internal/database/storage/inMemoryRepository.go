@@ -103,7 +103,7 @@ func (r *InMemoryRepository) CreateComment(authorID, postID string, content stri
 		AuthorID:  authorID,
 		PostID:    postID,
 		Content:   content,
-		CreatedAt: time.Now().Format(time.RFC3339), // Форматирование времени
+		CreatedAt: time.Now().Format(time.RFC3339),
 		Replies:   &model.CommentConnection{Edges: []*model.CommentEdge{}},
 	}
 
@@ -184,6 +184,10 @@ func (r *InMemoryRepository) CreateReply(authorID, postID string, content string
 		CreatedAt: time.Now().Format(time.RFC3339),
 	}
 
+	if parent.Replies == nil {
+		parent.Replies = &model.CommentConnection{Edges: []*model.CommentEdge{}}
+	}
+
 	parent.Replies.Edges = append(parent.Replies.Edges, &model.CommentEdge{
 		Cursor: reply.ID,
 		Node:   reply,
@@ -215,36 +219,44 @@ func (r *InMemoryRepository) GetRepliesByCommentID(commentID string, limit int, 
 		return nil, errors.New("comment not found")
 	}
 
-	replies := parentComment.Replies.Edges
+	replies := parentComment.Replies
+	if replies == nil {
+		return &model.CommentConnection{
+			Edges:    []*model.CommentEdge{},
+			PageInfo: &model.PageInfo{HasNextPage: false},
+		}, nil
+	}
 
 	startIndex := 0
 	if after != nil {
-		startIndex = r.findReplyIndex(*after, replies)
+		startIndex = r.findReplyIndex(*after, replies.Edges)
 		if startIndex == -1 {
 			return nil, errors.New("invalid cursor")
 		}
 		startIndex++
 	}
 
-	endIndex := len(replies)
-	if limit > 0 && limit < len(replies)-startIndex {
+	endIndex := len(replies.Edges)
+	if limit > 0 && limit < len(replies.Edges)-startIndex {
 		endIndex = startIndex + limit
 	}
 
 	var edges []*model.CommentEdge
-	for _, reply := range replies[startIndex:endIndex] {
-		edges = append(edges, &model.CommentEdge{
-			Cursor: reply.Cursor,
-			Node:   reply.Node,
-		})
+	for _, reply := range replies.Edges[startIndex:endIndex] {
+		if reply.Node != nil {
+			edges = append(edges, &model.CommentEdge{
+				Cursor: reply.Cursor,
+				Node:   reply.Node,
+			})
+		}
 	}
 
-	hasNextPage := endIndex < len(replies)
+	hasNextPage := endIndex < len(replies.Edges)
 
 	return &model.CommentConnection{
 		Edges: edges,
 		PageInfo: &model.PageInfo{
-			EndCursor:   r.getEndCursorEdges(replies[startIndex:endIndex]),
+			EndCursor:   r.getEndCursorEdges(replies.Edges[startIndex:endIndex]),
 			HasNextPage: hasNextPage,
 		},
 	}, nil

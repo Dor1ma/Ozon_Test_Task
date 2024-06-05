@@ -47,7 +47,7 @@ func main() {
 	}
 	defer db.Close(context.Background())
 
-	repo := storage.NewPostgreSQLRepository(db)
+	repo := storage.NewInMemoryRepository()
 	resolver := graphql.NewResolver(repo)
 
 	srv := handler.NewDefaultServer(graphql.NewExecutableSchema(graphql.Config{Resolvers: resolver}))
